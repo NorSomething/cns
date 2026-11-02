@@ -61,6 +61,79 @@ using Node = std::variant<
         : node(std::move(value)) {}
 };
 
+struct return_stmt {
+    expr_ptr value;
+};
+
+struct expr_stmt {
+    expr_ptr expression;
+};
+
+struct var_declr_stmt {
+    std::string type;
+    std::string name;
+    expr_ptr initializer;
+};
+
+struct compound_stmt {
+    std::vector<stmt_ptr> statements;
+};
+
+struct stmt {
+    using Node = std::variant<
+        return_stmt,
+        expr_stmt,
+        var_declr_stmt,
+        compound_stmt
+    >;
+
+    Node node;
+
+    template<typename T>
+    explicit stmt(T value)
+        : node(std::move(value)) {}
+};
+
+//declrs
+struct parameter {
+    std::string type;
+    std::string name;
+};
+
+struct function_declr {
+    std::string return_type;
+    std::string name;
+
+    std::vector<parameter> parameters;
+
+    stmt_ptr body; //null here then is just func prototype
+};
+
+struct variable_declr {
+    std::string type;
+    std::string name;
+    expr_ptr initializer;
+};
+
+struct namespace_declr {
+    std::string name;
+    std::vector<decl_ptr> declarations;
+};
+
+struct declaration {
+    using Node = std::variant<
+    namespace_declr,
+    function_declr,
+    variable_declr
+    >;
+
+    Node node;
+    template<typename T>
+    explicit declaration(T value)
+        : node(std::move(value)) {}
+};
+
+
 //src file here
 struct translation_unit {
     std::vector<decl_ptr> declarations;
