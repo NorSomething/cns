@@ -1,6 +1,7 @@
 //ai generated file i just wanted it to print tokens to test stuff
 
 #include "lexer.hpp"
+#include "parser.hpp"
 
 #include <fstream>
 #include <iostream>
@@ -78,7 +79,23 @@ int main(int argc, char* argv[]) {
                 << tokenName(token.type) << " "
                 << "'" << token.lexeme << "'\n";
         }
+
+        cns::parser parser(tokens);
+
+        auto ast = parser.parse();
+
+        std::cout << "\nParsing successful!\n";
+        std::cout << "Top-level declarations: "
+                  << ast.declarations.size() << '\n';
     } catch (const cns::LexError &error) {
+        std::cerr
+            << argv[1] << ":"
+            << error.line << ":"
+            << error.column << ": error: "
+            << error.what() << '\n';
+
+        return 1;
+    } catch (const cns::parse_error &error) {
         std::cerr
             << argv[1] << ":"
             << error.line << ":"

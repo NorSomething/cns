@@ -13,6 +13,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 add_executable(cns
     src/main.cpp
     src/lexer.cpp
+    src/parser.cpp
 )
 
 target_include_directories(cns PRIVATE include)

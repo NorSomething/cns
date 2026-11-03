@@ -57,8 +57,8 @@ using Node = std::variant<
     Node node;
 
     template<typename T>
-    explicit expr(T value)
-        : node(std::move(value)) {}
+    explicit expr(T value) //figure out T from args passed
+        : node(std::move(value)) {} //what it figured out before, now make it that
 };
 
 struct return_stmt {
