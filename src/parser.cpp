@@ -230,4 +230,20 @@ stmt_ptr parser::parse_return_statement() {
 
 }
 
+stmt_ptr parser::parse_compound_statement() {
+
+    consume(token_type::LEFT_BRACE, "didnt find {");
+
+    compound_stmt block;
+
+    while(!check(token_type::RIGHT_BRACE) && !is_at_end()) {
+        block.statements.push_back(parse_statement());
+    }
+
+    consume(token_type::RIGHT_BRACE, "didnt find } after func bod");
+
+    return std::make_unique<stmt>(std::move(block));
+
+}
+
 }
