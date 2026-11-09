@@ -163,11 +163,12 @@ void Lexer::scan_number() {
             advance();
         }
 
-        //TODO: add support for scientific notation!!
-
-        add_token(token_type::NUMBER);
-
     }
+
+    // Both integer and decimal literals are numbers.  Previously this was
+    // inside the decimal-only branch, so literals such as 10 and 20 simply
+    // disappeared from the token stream.
+    add_token(token_type::NUMBER);
 
 }
 

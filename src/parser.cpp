@@ -102,20 +102,50 @@ std::string parser::parse_type() {
     if (!is_type_start())
         throw parse_error("expected type", peek().line, peek().column);
 
-
-    //note; wtf is this func.. feels like something is wrong here but i cant put my finger on it
-    //i think its eating identifiers as types aswell
-
     std::string type;
-    while (is_type_start()) {
+    bool has_builtin_base = false;
+
+    //built in base is like a type with shi like unsigned int
+    while (true) {
+        switch (peek().type) {
+        case token_type::CONST:
+        case token_type::SIGNED:
+        case token_type::UNSIGNED:
+        case token_type::SHORT:
+        case token_type::LONG:
+            break;
+        case token_type::INT:
+        case token_type::CHAR:
+        case token_type::FLOAT:
+        case token_type::DOUBLE:
+        case token_type::VOID:
+            has_builtin_base = true;
+            break;
+        default:
+            goto done_with_builtin_type;
+        }
+
         if (!type.empty())
             type += ' ';
 
         type += advance().lexeme;
-
-        if (previous().type == token_type::IDENTIFIER)
-            break;
     }
+
+done_with_builtin_type:
+    if (!has_builtin_base && check(token_type::IDENTIFIER)) {
+        if (!type.empty())
+            type += ' ';
+        type += advance().lexeme;
+
+        while (match(token_type::SCOPE_RESOLUTION)) {
+            type += "::";
+            type += consume(token_type::IDENTIFIER, "expected type name after '::'").lexeme;
+        }
+    }
+
+    if (type.empty())
+        throw parse_error("expected type", peek().line, peek().column);
+
     return type;
 }
 
@@ -146,7 +176,13 @@ decl_ptr parser::parse_func_or_variable() {
         if (match(token_type::SEMICOLON)) {
             return std::make_unique<declaration>(std::move(function));
         }
-        throw parse_error("expected ';' after function prototype", peek().line, peek().column);
+
+        if (check(token_type::LEFT_BRACE)) {
+            function.body = parse_compound_statement();
+            return std::make_unique<declaration>(std::move(function));
+        }
+
+        throw parse_error("expected ';' or function body after parameters", peek().line, peek().column);
     }
 
     variable_declr variable;
@@ -203,7 +239,7 @@ stmt_ptr parser::parse_statement() {
         return parse_return_statement();
     }
 
-    if (match(token_type::LEFT_BRACE)) {
+    if (check(token_type::LEFT_BRACE)) {
         return parse_compound_statement();
     }
 
@@ -245,5 +281,211 @@ stmt_ptr parser::parse_compound_statement() {
     return std::make_unique<stmt>(std::move(block));
 
 }
+
+expr_ptr parser::parse_equiality() {
+    expr_ptr expression = parse_comparision();
+
+    while (match(token_type::EQUAL_EQUAL) || match(token_type::BANG_EQUAL)) {
+
+        std::string op = previous().lexeme;
+        expr_ptr right = parse_comparision();
+
+        expression = std::make_unique<expr>(binary_expr{
+            op,
+            std::move(expression),
+            std::move(right)
+        });
+
+    }
+
+    return expression;
+
+}
+
+expr_ptr parser::parse_factor() {
+
+    expr_ptr expression = parse_unary();
+
+    while (match(token_type::STAR) || match(token_type::SLASH) || match(token_type::PERCENT)) {
+
+        std::string op = previous().lexeme;
+        expr_ptr right = parse_unary();
+
+        expression = std::make_unique<expr>(binary_expr{
+            op,
+            std::move(expression),
+            std::move(right)
+        });
+
+    }
+
+    return expression;
+
+}
+
+expr_ptr parser::parse_comparision() {
+
+   expr_ptr expression = parse_terms();
+
+   while (match(token_type::LESS) || match(token_type::LESS_EQUAL) || match(token_type::GREATER_EQUAL) || match(token_type::GREATER)) {
+
+       std::string op = previous().lexeme;
+       expr_ptr right = parse_terms();
+
+       expression = std::make_unique<expr>(binary_expr {
+           op,
+           std::move(expression),
+           std::move(right)
+       });
+
+   }
+
+   return expression;
+
+
+}
+
+expr_ptr parser::parse_terms() {
+
+    expr_ptr expression = parse_factor();
+
+    while (match(token_type::PLUS) || match(token_type::MINUS)) {
+
+        std::string op = previous().lexeme;
+        expr_ptr right = parse_factor();
+
+        expression = std::make_unique<expr>(binary_expr {
+
+            op,
+            std::move(expression),
+            std::move(right)
+
+        });
+
+    }
+
+    return expression;
+
+}
+
+expr_ptr parser::parse_unary() {
+
+    if (match(token_type::BANG) || match(token_type::PLUS) || match(token_type::MINUS)) {
+
+        std::string op = previous().lexeme;
+        expr_ptr operand = parse_unary();
+
+        return std::make_unique<expr>(unary_expr {
+
+            op,
+            std::move(operand)
+
+        });
+
+
+    }
+
+    return parse_call();
+
+}
+
+expr_ptr parser::parse_call() {
+
+    expr_ptr expression = parse_primary();
+
+    while(match(token_type::LEFT_PAREN)) {
+
+        std::vector<expr_ptr> args;
+
+        if (!check(token_type::RIGHT_PAREN)) {
+            do {
+                args.push_back(parse_expression());
+            }while (match(token_type::COMMA));
+        }
+
+        consume(token_type::RIGHT_PAREN, "didnt find ) after args");
+
+        expression = std::make_unique<expr>(call_expr{
+
+           std::move(expression),
+           std::move(args)
+
+        });
+
+
+    }
+
+    return expression;
+
+}
+
+expr_ptr parser::parse_primary() {
+
+    if (match(token_type::NUMBER)) {
+        return std::make_unique<expr>(num_expr{
+            previous().lexeme
+        });
+    }
+
+    if (match(token_type::STRING_LITERAL)) {
+        return std::make_unique<expr>(str_expr{
+           previous().lexeme
+        });
+    }
+
+    if (match(token_type::IDENTIFIER)) {
+        std::vector<std::string> parts;
+
+        parts.push_back(previous().lexeme);
+
+        while(match(token_type::SCOPE_RESOLUTION)) {
+            const Token &name = consume(token_type::IDENTIFIER, "no identifier after ::");
+            parts.push_back(name.lexeme);
+        }
+
+        return std::make_unique<expr>(name_expr{
+            std::move(parts)
+        });
+
+    }
+
+    if (match(token_type::LEFT_PAREN)) {
+        expr_ptr expression = parse_expression();
+
+        consume(token_type::RIGHT_PAREN, "expected )");
+        return expression;
+    }
+
+    //failsafe
+    throw parse_error("expected expression", peek().line, peek().column);
+
+}
+
+expr_ptr parser::parse_expression() {
+    return parse_assignments();
+}
+
+expr_ptr parser::parse_assignments() {
+
+    expr_ptr expression = parse_equiality();
+
+    if (match(token_type::EQUAL)) {
+
+        std::string op = previous().lexeme;
+        expr_ptr value = parse_assignments();
+
+        return std::make_unique<expr>(binary_expr{
+            op,
+            std::move(expression),
+            std::move(value)
+        });
+
+    }
+
+    return expression;
+
+
+}
+
 
 }
