@@ -43,6 +43,10 @@ class parser {
         decl_ptr parse_namespace();
         decl_ptr parse_func_or_variable();
 
+        //funcs
+        std::vector<parameter> parse_parameters();
+
+        //statements
         stmt_ptr parse_statement();
         stmt_ptr parse_compound_statement();
         stmt_ptr parse_return_statement();
@@ -58,7 +62,7 @@ class parser {
         expr_ptr parse_call();
         expr_ptr parse_primary();
 
-        //some helpers
+        //some helpers (type handling)
         std::string parse_type();
         bool is_type_start() const;
 };

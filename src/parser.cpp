@@ -1,6 +1,8 @@
 #include "lexer.hpp"
 #include "ast.hpp"
+#include <memory>
 #include <stdexcept>
+#include <vector>
 #include "parser.hpp"
 
 namespace cns {
@@ -169,6 +171,62 @@ decl_ptr parser::parse_namespace() {
     consume(token_type::RIGHT_BRACE, "Expected } after namespace name");
 
     return std::make_unique<declaration>(std::move(ns));
+
+}
+
+std::vector<parameter> parser::parse_parameters() {
+
+    std::vector<parameter> parameters;
+
+    //no params
+    if (check(token_type::RIGHT_PAREN)) {
+        return parameters;
+    }
+
+    do {
+        //get atleast first param then check cond
+        std::string type = parse_type();
+
+        const Token &name = consume(token_type::IDENTIFIER, "where param name :(");
+
+        parameters.push_back({type, name.lexeme});
+
+    } while(match(token_type::COMMA));
+
+    return parameters;
+
+}
+
+stmt_ptr parser::parse_statement() {
+
+    if (match(token_type::RETURN)) {
+        return parse_return_statement();
+    }
+
+    if (match(token_type::LEFT_BRACE)) {
+        return parse_compound_statement();
+    }
+
+    //temp easy soln
+    expr_ptr expression = parse_expression();
+
+    consume(token_type::SEMICOLON, "didnt find ; after expression");
+
+    return std::make_unique<stmt>(expr_stmt{std::move(expression)}); //such an ugly yet crazy statement
+
+}
+
+stmt_ptr parser::parse_return_statement() {
+
+    expr_ptr value = nullptr; //if void return type
+
+   if (!check(token_type::SEMICOLON)) {
+       value = parse_expression();
+   }
+
+   consume(token_type::SEMICOLON, "didnt find ; after return statemnet");
+
+   return std::make_unique<stmt>(return_stmt{std::move(value)});
 
 }
 
